@@ -84,4 +84,49 @@ ggplot(df_eda, aes(x = num_mov_conto, fill = as.factor(num_fraud))) +
   labs(title = "Kontobewegungen und Fraud", x = "Kontobewegungen", y = "Anzahl") +
   theme_minimal()
 
-# TEST LORENZ
+
+
+
+# rel. fraud nach alter (col 2/13) XX
+ggplot(datensatz, aes(x = age, fill = as.factor(num_fraud))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("steelblue", "red"), name = "Fraud (0/1)") +
+  labs(title = "Relativer Anteil Betrugsfälle nach Alter",
+       x = "Alter",
+       y = "Anteil (1.0 = 100%)") +
+  theme_minimal()
+
+# rel. fraud nach profession (col 3/13)
+ggplot(datensatz, aes(x = profession, fill = as.factor(num_fraud))) +
+  geom_bar(position = "fill") +
+  coord_flip() +
+  scale_fill_manual(values = c("steelblue", "red"), name = "Fraud (0/1)") +
+  labs(title = "Relativer Anteil Betrugsfälle nach Beruf",
+       x = "Beruf",
+       y = "Anteil (1.0 = 100%)") +
+  theme_minimal()
+
+# rel. fraud nach region (col 4/13)
+ggplot(datensatz, aes(x = region, fill = as.factor(num_fraud))) +
+  geom_bar(position = "fill") +
+  coord_flip() +
+  scale_fill_manual(values = c("steelblue", "red"), name = "Fraud (0/1)") +
+  labs(title = "Relativer Anteil Betrugsfälle nach Region",
+       x = "Region",
+       y = "Anteil (1.0 = 100%)") +
+  theme_minimal()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
