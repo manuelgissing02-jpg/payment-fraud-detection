@@ -83,3 +83,5 @@ ggplot(df_eda, aes(x = num_mov_conto, fill = as.factor(num_fraud))) +
   scale_fill_manual(values = c("steelblue", "red"), name = "Fraud") +
   labs(title = "Kontobewegungen und Fraud", x = "Kontobewegungen", y = "Anzahl") +
   theme_minimal()
+
+# TEST LORENZ
