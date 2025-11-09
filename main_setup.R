@@ -96,6 +96,14 @@ ggplot(datensatz, aes(x = age, fill = as.factor(num_fraud))) +
        y = "Anteil (1.0 = 100%)") +
   theme_minimal()
 
+# abs. fraud nach alter (col 2/13) XX
+ggplot(subset(datensatz, num_fraud == 1), aes(x = age)) +
+  geom_bar(fill = "red") +
+  labs(title = "Absolute Anzahl Betrugsfälle nach Alter",
+       x = "Alter",
+       y = "Anzahl") +
+  theme_minimal()
+
 # rel. fraud nach profession (col 3/13)
 ggplot(datensatz, aes(x = profession, fill = as.factor(num_fraud))) +
   geom_bar(position = "fill") +
@@ -104,6 +112,14 @@ ggplot(datensatz, aes(x = profession, fill = as.factor(num_fraud))) +
   labs(title = "Relativer Anteil Betrugsfälle nach Beruf",
        x = "Beruf",
        y = "Anteil (1.0 = 100%)") +
+  theme_minimal()
+
+# abs. fraud nach profession (col 3/13)
+ggplot(subset(datensatz, num_fraud == 1), aes(x = profession)) +
+  geom_bar(fill = "red") +
+  labs(title = "Absolute Anzahl Betrugsfälle nach Beruf",
+       x = "Beruf",
+       y = "Anzahl") +
   theme_minimal()
 
 # rel. fraud nach region (col 4/13)
@@ -116,9 +132,165 @@ ggplot(datensatz, aes(x = region, fill = as.factor(num_fraud))) +
        y = "Anteil (1.0 = 100%)") +
   theme_minimal()
 
+# abs. fraud nach region (col 4/13)
+ggplot(subset(datensatz, num_fraud == 1), aes(x = region)) +
+  geom_bar(fill = "red") +
+  labs(title = "Absolute Anzahl Betrugsfälle nach Region",
+       x = "Region",
+       y = "Anzahl") +
+  theme_minimal()
 
+# rel. fraud nach Kontostand (col 5/13)
+ggplot(datensatz, aes(x = account_balance, fill = as.factor(num_fraud))) +
+  geom_histogram(position = "fill", bins = 60) +
+  scale_fill_manual(values = c("steelblue", "red"), name = "Fraud (0/1)") +
+  scale_x_continuous(labels = scales::comma) +
+  labs(title = "Relativer Anteil Betrugsfälle nach Kontostand",
+       subtitle = "Aufgeteilt in 60 gleich breite Intervalle",
+       x = "Kontostand",
+       y = "Anteil (1.0 = 100%)") +
+  theme_minimal()
 
+# abs. fraud nach Kontostand (col 5/13)
+ggplot(subset(datensatz, num_fraud == 1), aes(x = account_balance)) +
+  geom_histogram(bins = 60, fill = "red", color = "white") +
+  scale_x_continuous(labels = scales::comma) +
+  labs(title = "Absolute Anzahl Betrugsfälle nach Kontostand",
+       subtitle = "Nur Transaktionen mit Fraud = 1, aufgeteilt in 60 Intervalle",
+       x = "Kontostand",
+       y = "Anzahl Betrugsfälle") +
+  theme_minimal()
 
+# rel. fraud nach num_debit (col 6/13)
+ggplot(datensatz, aes(x = num_debit, fill = as.factor(num_fraud))) +
+  geom_histogram(position = "fill", bins = 60) +
+  scale_fill_manual(values = c("steelblue", "red"), name = "Fraud (0/1)") +
+  labs(title = "Relativer Anteil Betrugsfälle nach num_debit",
+       subtitle = "Aufgeteilt in 60 Intervalle",
+       x = "num_debit",
+       y = "Anteil (1.0 = 100%)") +
+  theme_minimal()
+
+# abs. fraud nach num_debit (col 6/13) ohne num_debit = 0
+ggplot(subset(datensatz, num_fraud == 1 & num_debit != 0), aes(x = num_debit)) +
+  geom_bar(fill = "red") +
+  labs(title = "Absolute Anzahl Betrugsfälle nach num_debit",
+       subtitle = "Werte mit num_debit = 0 ausgeschlossen",
+       x = "num_debit",
+       y = "Anzahl") +
+  theme_minimal()
+
+# rel. fraud nach num_credit (col 7/13)
+ggplot(datensatz, aes(x = num_credit, fill = as.factor(num_fraud))) +
+  geom_histogram(position = "fill", bins = 60) +
+  scale_fill_manual(values = c("steelblue", "red"), name = "Fraud (0/1)") +
+  labs(title = "Relativer Anteil Betrugsfälle nach num_credit",
+       subtitle = "Aufgeteilt in 60 Intervalle",
+       x = "num_credit",
+       y = "Anteil (1.0 = 100%)") +
+  theme_minimal()
+
+# abs. fraud nach num_debit (col 7/13) ohne num_credit = 0
+ggplot(subset(datensatz, num_fraud == 1 & num_credit != 0), aes(x = num_credit)) +
+  geom_bar(fill = "red") +
+  labs(title = "Absolute Anzahl Betrugsfälle nach num_credit",
+       subtitle = "Werte mit num_credit = 0 ausgeschlossen",
+       x = "num_credit",
+       y = "Anzahl") +
+  theme_minimal()
+
+# rel. fraud nach num_pos (col 8/13)
+ggplot(datensatz, aes(x = num_pos, fill = as.factor(num_fraud))) +
+  geom_histogram(position = "fill", bins = 60) +
+  scale_fill_manual(values = c("steelblue", "red"), name = "Fraud (0/1)") +
+  labs(title = "Relativer Anteil Betrugsfälle nach num_pos",
+       subtitle = "Aufgeteilt in 60 Intervalle",
+       x = "num_pos",
+       y = "Anteil (1.0 = 100%)") +
+  theme_minimal()
+
+# abs. fraud nach num_pos (col 8/13) ohne num_pos = 0
+ggplot(subset(datensatz, num_fraud == 1 & num_pos != 0), aes(x = num_pos)) +
+  geom_bar(fill = "red") +
+  labs(title = "Absolute Anzahl Betrugsfälle nach num_pos",
+       subtitle = "Werte mit num_pos = 0 ausgeschlossen",
+       x = "num_pos",
+       y = "Anzahl") +
+  theme_minimal()
+
+# rel. fraud nach num_mov_conto (col 9/13)
+ggplot(datensatz, aes(x = num_mov_conto, fill = as.factor(num_fraud))) +
+  geom_histogram(position = "fill", bins = 60) +
+  scale_fill_manual(values = c("steelblue", "red"), name = "Fraud (0/1)") +
+  labs(title = "Relativer Anteil Betrugsfälle nach num_mov_conto",
+       subtitle = "Aufgeteilt in 60 Intervalle",
+       x = "num_mov_conto",
+       y = "Anteil (1.0 = 100%)") +
+  theme_minimal()
+
+# abs. fraud nach num_mov_conto (col 9/13) ohne num_mov_conto = 0
+ggplot(subset(datensatz, num_fraud == 1 & num_mov_conto != 0), aes(x = num_mov_conto)) +
+  geom_bar(fill = "red") +
+  labs(title = "Absolute Anzahl Betrugsfälle nach num_mov_conto",
+       subtitle = "Werte mit num_mov_conto = 0 ausgeschlossen",
+       x = "num_mov_conto",
+       y = "Anzahl") +
+  theme_minimal()
+
+# rel. fraud nach incoming_payments (col 10/13)
+ggplot(datensatz, aes(x = incoming_payments, fill = as.factor(num_fraud))) +
+  geom_histogram(position = "fill", bins = 60) +
+  scale_fill_manual(values = c("steelblue", "red"), name = "Fraud (0/1)") +
+  labs(title = "Relativer Anteil Betrugsfälle nach incoming_payments",
+       subtitle = "Aufgeteilt in 60 Intervalle",
+       x = "incoming_payments",
+       y = "Anteil (1.0 = 100%)") +
+  theme_minimal()
+
+# abs. fraud nach incoming_payments (col 10/13) ohne incoming_payments = 0
+ggplot(subset(datensatz, num_fraud == 1 & incoming_payments != 0), aes(x = incoming_payments)) +
+  geom_histogram(bins = 60, fill = "red", color = "white") +
+  labs(title = "Absolute Anzahl Betrugsfälle nach incoming_payments",
+       subtitle = "Werte mit incoming_payments = 0 ausgeschlossen (60 Bins)",
+       x = "incoming_payments",
+       y = "Anzahl") +
+  theme_minimal()
+
+# rel. fraud nach outgoing_payments (col 11/13)
+ggplot(datensatz, aes(x = outgoing_payments, fill = as.factor(num_fraud))) +
+  geom_histogram(position = "fill", bins = 60) +
+  scale_fill_manual(values = c("steelblue", "red"), name = "Fraud (0/1)") +
+  labs(title = "Relativer Anteil Betrugsfälle nach outgoing_payments",
+       subtitle = "Aufgeteilt in 60 Intervalle",
+       x = "outgoing_payments",
+       y = "Anteil (1.0 = 100%)") +
+  theme_minimal()
+
+# abs. fraud nach outgoing_payments (col 11/13) ohne outgoing_payments = 0
+ggplot(subset(datensatz, num_fraud == 1 & outgoing_payments != 0), aes(x = outgoing_payments)) +
+  geom_histogram(bins = 60, fill = "red", color = "white") +
+  labs(title = "Absolute Anzahl Betrugsfälle nach outgoing_payments",
+       subtitle = "Werte mit outgoing_payments = 0 ausgeschlossen (60 Bins)",
+       x = "outgoing_payments",
+       y = "Anzahl") +
+  theme_minimal()
+
+# rel. fraud nach product_number (col 12/13)
+ggplot(datensatz, aes(x = product_number, fill = as.factor(num_fraud))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("steelblue", "red"), name = "Fraud (0/1)") +
+  labs(title = "Relativer Anteil Betrugsfälle nach product_number",
+       x = "product_number",
+       y = "Anteil (1.0 = 100%)") +
+  theme_minimal()
+
+# abs. fraud nach product_number (col 12/13)
+ggplot(subset(datensatz, num_fraud == 1), aes(x = product_number)) +
+  geom_bar(fill = "red") +
+  labs(title = "Absolute Anzahl Betrugsfälle nach product_number",
+       x = "product_number",
+       y = "Anzahl") +
+  theme_minimal()
 
 
 
