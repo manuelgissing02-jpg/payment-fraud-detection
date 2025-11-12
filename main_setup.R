@@ -2,7 +2,7 @@
 #aktivieren der Packages für Daten einlesen und bereinigen
 
 # 👇 Vorbereitung: Falls Pakete noch nicht installiert sind, werden sie automatisch installiert
-packages <- c("readr", "dplyr", "tidyr", "skimr","ggplot2")
+packages <- c("readr", "dplyr", "tidyr", "skimr", "ggplot2", "lubridate")
 
 for (p in packages) {
   if (!require(p, character.only = TRUE)) {
