@@ -292,7 +292,7 @@ ggplot(subset(datensatz, num_fraud == 1), aes(x = product_number)) +
        y = "Anzahl") +
   theme_minimal()
 
-
+# Test 27.12.
 
 
 
