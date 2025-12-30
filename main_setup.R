@@ -60,7 +60,7 @@ df_sorted <- datensatz %>%
 
 summary(df_sorted)
 
-# Datum umwandeln (nur month, kein weekday!)
+# Datum umwandeln
 df_eda <- df_sorted %>%
   mutate(
     date = as.Date(date, format = "%Y-%m-%d"),  # richtiges Datum
