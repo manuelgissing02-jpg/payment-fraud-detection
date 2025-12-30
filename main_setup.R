@@ -2,7 +2,7 @@
 #aktivieren der Packages für Daten einlesen und bereinigen
 
 # 👇 Vorbereitung: Falls Pakete noch nicht installiert sind, werden sie automatisch installiert
-packages <- c("readr", "dplyr", "tidyr", "skimr", "ggplot2", "lubridate", "caret")
+packages <- c("readr", "dplyr", "tidyr", "skimr", "ggplot2", "lubridate", "caret", "randomForest", "pROC", "ROSE")
 
 for (p in packages) {
   if (!require(p, character.only = TRUE)) {
@@ -26,9 +26,22 @@ any(duplicated(datensatz))
 
 colnames(datensatz) <- c("date", "age", "profession","region", "account_balance", "num_debit","num_credit","num_pos","num_mov_conto","incoming_payments","outgoing_payments","product_number","num_fraud")
 
-# id für jede Zeile
+# id einfügen
 
-datensatz$id <- 1:nrow(datensatz)
+datensatz <- datensatz %>%
+  mutate(
+    id = row_number()                                   
+  )
+
+# Ersatz: keine Angabe für NA bei Beruf und Region
+datensatz <- datensatz %>%
+  mutate(
+    profession = ifelse(is.na(profession) | profession == "", "Keine Angabe", profession),
+    region     = ifelse(is.na(region)     | region == "",     "Keine Angabe", region)
+  )
+
+# Bei sonstigen NA: 0 Ersatz
+datensatz[is.na(datensatz)] <- 0
 
 
 ##2627 zeilen wurden gelöscht, schaupsi wann gehma bier trinken?
@@ -47,7 +60,7 @@ df_sorted <- datensatz %>%
 
 summary(df_sorted)
 
-# Datum umwandeln
+# Datum umwandeln (nur month, kein weekday!)
 df_eda <- df_sorted %>%
   mutate(
     date = as.Date(date, format = "%Y-%m-%d"),  # richtiges Datum
@@ -319,7 +332,95 @@ df_low_test <- df_low_full %>% filter(!id %in% df_low_train$id)
 df_all_train <- df_all_full %>% sample_frac(train_size)
 df_all_test <- df_all_full %>% filter(!id %in% df_all_train$id)
 
+# ==============================================================================
+# MODELLIERUNG & EVALUIERUNG
+# ==============================================================================
 
+train_and_evaluate <- function(train_df, test_df, segment_name) {
+  
+  cat(paste0("\n##########################################################\n"))
+  cat(paste0("   START ANALYSE FÜR SEGMENT: ", segment_name, "\n"))
+  cat(paste0("##########################################################\n"))
+  
+  # A) Vorbereitung
+  # Zielvariable muss Faktor sein
+  train_df$num_fraud <- as.factor(train_df$num_fraud)
+  test_df$num_fraud  <- as.factor(test_df$num_fraud)
+  
+  # date - Ausschluss
+  train_data_model <- train_df %>% select(-date)
+  test_data_model  <- test_df  %>% select(-date)
+  
+  # B) Balancing (Upsampling)
+  set.seed(123) 
+  
+  # Upsampling
+  up_train <- upSample(x = train_data_model[, names(train_data_model) != "num_fraud"],
+                       y = train_data_model$num_fraud)
+  colnames(up_train)[colnames(up_train) == "Class"] <- "num_fraud"
+  
+  cat("Verteilung nach Upsampling (Trainingsdaten):\n")
+  print(table(up_train$num_fraud))
+  
+  # -------------------------------------------------------
+  # MODELL 1: Logistische Regression
+  # -------------------------------------------------------
+  cat("\n-> Trainiere Logistische Regression...\n")
+  
+  # Training exkl. ID
+  model_log <- glm(num_fraud ~ . - id, data = up_train, family = binomial)
+  
+  pred_log_prob <- predict(model_log, newdata = test_data_model, type = "response")
+  pred_log_class <- as.factor(ifelse(pred_log_prob > 0.5, 1, 0))
+  
+  # -------------------------------------------------------
+  # MODELL 2: Random Forest
+  # -------------------------------------------------------
+  cat("-> Trainiere Random Forest (Geduld...)\n")
+  
+  # Training exkl. ID
+  model_rf <- randomForest(num_fraud ~ . - id, data = up_train, ntree = 100)
+  
+  pred_rf_class <- predict(model_rf, newdata = test_data_model)
+  pred_rf_prob  <- predict(model_rf, newdata = test_data_model, type = "prob")[,2]
+  
+  # -------------------------------------------------------
+  # EVALUIERUNG
+  # -------------------------------------------------------
+  cat("\n--- Ergebnisse: Logistische Regression ---\n")
+  cm_log <- confusionMatrix(pred_log_class, test_data_model$num_fraud, positive = "1")
+  print(cm_log$byClass[c("Sensitivity", "Specificity", "Precision", "F1")])
+  roc_log <- roc(response = test_data_model$num_fraud, predictor = pred_log_prob, quiet = TRUE)
+  cat(paste("AUC LogReg:", round(auc(roc_log), 4), "\n"))
+  
+  cat("\n--- Ergebnisse: Random Forest ---\n")
+  cm_rf <- confusionMatrix(pred_rf_class, test_data_model$num_fraud, positive = "1")
+  print(cm_rf$byClass[c("Sensitivity", "Specificity", "Precision", "F1")])
+  roc_rf <- roc(test_data_model$num_fraud, pred_rf_prob, quiet = TRUE)
+  cat(paste("AUC Random Forest:", round(auc(roc_rf), 4), "\n"))
+  
+  return(list(log = model_log, rf = model_rf))
+}
 
+# ==============================================================================
+# AUSFÜHRUNG
+# ==============================================================================
+
+# 1. Segment: Alle Daten
+res_all <- train_and_evaluate(df_all_train, df_all_test, "ALLE DATEN")
+
+# 2. Segment: High Balance
+if(nrow(df_high_train) > 0) {
+  res_high <- train_and_evaluate(df_high_train, df_high_test, "HIGH BALANCE")
+} else {
+  cat("Zu wenig Daten für High Balance.\n")
+}
+
+# 3. Segment: Low Balance
+if(nrow(df_low_train) > 0) {
+  res_low <- train_and_evaluate(df_low_train, df_low_test, "LOW BALANCE")
+} else {
+  cat("Zu wenig Daten für Low Balance.\n")
+}
 
 
