@@ -1,8 +1,8 @@
 # Project Setup
 #aktivieren der Packages für Daten einlesen und bereinigen
-
+setwd("~/GitHub/payment-fraud-detection")
 # 👇 Vorbereitung: Falls Pakete noch nicht installiert sind, werden sie automatisch installiert
-packages <- c("readr", "dplyr", "tidyr", "skimr", "ggplot2", "lubridate", "caret", "randomForest", "pROC", "ROSE")
+packages <- c("readr", "dplyr", "tidyr", "skimr", "ggplot2", "lubridate", "caret", "randomForest", "pROC", "ROSE", "xgboost", "Matrix", "kernlab")
 
 for (p in packages) {
   if (!require(p, character.only = TRUE)) {
@@ -385,6 +385,95 @@ train_and_evaluate <- function(train_df, test_df, segment_name) {
   pred_rf_prob  <- predict(model_rf, newdata = test_data_model, type = "prob")[,2]
   
   # -------------------------------------------------------
+  # MODELL 3: XGBoost 
+  # -------------------------------------------------------
+  cat("-> Trainiere XGBoost (High Performance)...\n")
+  
+  # A) Datenvorbereitung: XGBoost braucht eine numerische Matrix (keine Factors!)
+  # Wir nutzen sparse.model.matrix, um Kategorien (z.B. Region) in Zahlen umzuwandeln
+  
+  # Train Matrix erstellen
+  dtrain_matrix <- sparse.model.matrix(num_fraud ~ . -id, data = up_train)[,-1]
+  dtrain_label  <- as.numeric(as.character(up_train$num_fraud)) # Zielvariable als 0/1 Zahl
+  dtrain <- xgb.DMatrix(data = dtrain_matrix, label = dtrain_label)
+  
+  # Test Matrix erstellen (muss genau die gleiche Struktur haben!)
+  dtest_matrix <- sparse.model.matrix(num_fraud ~ . -id, data = test_data_model)[,-1]
+  dtest_label  <- as.numeric(as.character(test_data_model$num_fraud))
+  
+  # B) Hyperparameter setzen (Basis-Setup)
+  params <- list(
+    booster = "gbtree",
+    objective = "binary:logistic", # Da wir Ja/Nein vorhersagen
+    eta = 0.1,                     # Lernrate (kleiner = genauer, aber langsamer)
+    max_depth = 6,                 # Tiefe der Bäume
+    eval_metric = "auc"            # Wir optimieren auf AUC
+  )
+  
+  # C) Training
+  model_xgb <- xgb.train(
+    params = params,
+    data = dtrain,
+    nrounds = 100,                 # Anzahl der Durchläufe
+    verbose = 0                    # 0 = keine nervigen Zwischenmeldungen
+  )
+  
+  # D) Vorhersage
+  pred_xgb_prob <- predict(model_xgb, newdata = dtest_matrix)
+  pred_xgb_class <- as.factor(ifelse(pred_xgb_prob > 0.5, 1, 0))
+  
+ ' # -------------------------------------------------------
+  # MODELL 4: Support Vector Machine (SVM) - LIGHT VERSION
+  # -------------------------------------------------------
+  cat("-> Trainiere SVM (Light-Version für Speed)...\n")
+  
+  svm_train_data <- up_train
+  svm_test_data  <- test_data_model
+  
+  # Umbenennen für caret
+  levels(svm_train_data$num_fraud) <- c("No", "Yes")
+  levels(svm_test_data$num_fraud)  <- c("No", "Yes")
+  
+  # A) Setup: KEINE Cross-Validation (method="none" ist extrem schnell)
+  ctrl_svm <- trainControl(method = "none", classProbs = TRUE) 
+  
+  # B) Training: Nur EIN Versuch (tuneLength = 1)
+  model_svm <- train(num_fraud ~ . - id, 
+                     data = svm_train_data, 
+                     method = "svmRadial",
+                     preProcess = c("center", "scale"), 
+                     trControl = ctrl_svm,
+                     tuneLength = 1) # <--- Nimmt einfach den Standardwert
+  
+  # C) Vorhersage
+  pred_svm_prob <- predict(model_svm, newdata = svm_test_data, type = "prob")[,"Yes"]
+  pred_svm_class <- predict(model_svm, newdata = svm_test_data)
+  
+  # -------------------------------------------------------
+  # EVALUIERUNG SVM
+  # -------------------------------------------------------
+  # D) Evaluierung
+  cat("\n--- Ergebnisse: SVM ---\n")
+  cm_svm <- confusionMatrix(pred_svm_class, svm_test_data$num_fraud, positive = "Yes")
+  print(cm_svm$byClass[c("Sensitivity", "Specificity", "Precision", "F1")])
+  
+  roc_svm <- roc(response = svm_test_data$num_fraud, predictor = pred_svm_prob, 
+                 levels = c("No", "Yes"), direction = "<", quiet = TRUE)
+  cat(paste("AUC SVM:", round(auc(roc_svm), 4), "\n"))
+  '
+  
+  
+  # -------------------------------------------------------
+  # EVALUIERUNG XGBoost
+  # -------------------------------------------------------
+  cat("\n--- Ergebnisse: XGBoost ---\n")
+  cm_xgb <- confusionMatrix(pred_xgb_class, test_data_model$num_fraud, positive = "1")
+  print(cm_xgb$byClass[c("Sensitivity", "Specificity", "Precision", "F1")])
+  
+  roc_xgb <- roc(test_data_model$num_fraud, pred_xgb_prob, quiet = TRUE)
+  cat(paste("AUC XGBoost:", round(auc(roc_xgb), 4), "\n"))
+  
+  # -------------------------------------------------------
   # EVALUIERUNG
   # -------------------------------------------------------
   cat("\n--- Ergebnisse: Logistische Regression ---\n")
@@ -399,7 +488,7 @@ train_and_evaluate <- function(train_df, test_df, segment_name) {
   roc_rf <- roc(test_data_model$num_fraud, pred_rf_prob, quiet = TRUE)
   cat(paste("AUC Random Forest:", round(auc(roc_rf), 4), "\n"))
   
-  return(list(log = model_log, rf = model_rf))
+  return(list(log = model_log, rf = model_rf,xgb = model_xgb))
 }
 
 # ==============================================================================
@@ -422,5 +511,76 @@ if(nrow(df_low_train) > 0) {
 } else {
   cat("Zu wenig Daten für Low Balance.\n")
 }
+
+# --- BONUS: WAS SIND DIE TREIBER FÜR BETRUG? ---
+
+# Wir holen uns die Wichtigkeit aus dem XGBoost Modell (Segement: Alle Daten)
+importance_matrix <- xgb.importance(model = res_all$xgb)
+
+# Plotten der Top 10 Faktoren
+xgb.plot.importance(importance_matrix, top_n = 10, main = "Top 10 Indikatoren für Betrug (XGBoost)")
+
+# Wir nehmen den globalen Test-Datensatz (ohne Datum, wie im Training)
+test_data_plot <- df_all_test %>% select(-date)
+
+# A) Vorhersagen für Logistische Regression holen
+pred_prob_log <- predict(res_all$log, newdata = test_data_plot, type = "response")
+
+# B) Vorhersagen für Random Forest holen
+# (Falls du 'ranger' nutzt, ist der Befehl anders -> siehe Kommentar!)
+pred_prob_rf <- predict(res_all$rf, newdata = test_data_plot, type = "prob")[,2]
+# Falls Fehler bei ranger: pred_prob_rf <- predict(res_all$rf, data = test_data_plot)$predictions[,"1"]
+
+# C) Vorhersagen für XGBoost holen (braucht Matrix!)
+dtest_matrix_plot <- sparse.model.matrix(num_fraud ~ . -id, data = test_data_plot)[,-1]
+pred_prob_xgb <- predict(res_all$xgb, newdata = dtest_matrix_plot)
+
+
+# =========================================================
+# FIX: ROC-Plot 
+# =========================================================
+
+# 1. Sicherstellen, dass wir die Testdaten haben (ohne Datum)
+# WICHTIG: df_all_test muss existieren (wurde weiter oben im Skript erstellt)
+if(exists("df_all_test")) {
+  test_data_plot <- df_all_test %>% dplyr::select(-date)
+} else {
+  stop("Fehler: Bitte führe erst den oberen Teil des Skripts aus, damit 'df_all_test' da ist!")
+}
+
+# 2. Vorhersagen berechnen
+# Logistische Regression
+pred_prob_log <- predict(res_all$log, newdata = test_data_plot, type = "response")
+
+# Random Forest (Check, ob ranger oder randomForest genutzt wird)
+if(inherits(res_all$rf, "ranger")) {
+  # Falls du meinen Tipp mit 'ranger' genutzt hast:
+  pred_prob_rf <- predict(res_all$rf, data = test_data_plot)$predictions[,"1"]
+} else {
+  # Falls du noch das alte 'randomForest' nutzt:
+  pred_prob_rf <- predict(res_all$rf, newdata = test_data_plot, type = "prob")[,2]
+}
+
+# XGBoost (braucht Matrix)
+dtest_matrix_plot <- sparse.model.matrix(num_fraud ~ . -id, data = test_data_plot)[,-1]
+pred_prob_xgb <- predict(res_all$xgb, newdata = dtest_matrix_plot)
+
+# 3. Plot zeichnen
+library(pROC) # Sicherstellen, dass pROC geladen ist
+roc_log <- roc(test_data_plot$num_fraud, pred_prob_log, quiet = TRUE)
+roc_rf  <- roc(test_data_plot$num_fraud, pred_prob_rf, quiet = TRUE)
+roc_xgb <- roc(test_data_plot$num_fraud, pred_prob_xgb, quiet = TRUE)
+
+# Grafik
+plot(roc_xgb, col = "darkgreen", lwd = 2, main = "Modell-Vergleich: Wer erkennt Betrug am besten?")
+plot(roc_rf, add = TRUE, col = "blue", lwd = 2)
+plot(roc_log, add = TRUE, col = "red", lwd = 2)
+
+legend("bottomright", 
+       legend = c(paste0("XGBoost (AUC: ", round(auc(roc_xgb), 3), ")"),
+                  paste0("Random Forest (AUC: ", round(auc(roc_rf), 3), ")"),
+                  paste0("Log. Regression (AUC: ", round(auc(roc_log), 3), ")")),
+       col = c("darkgreen", "blue", "red"), 
+       lwd = 2)
 
 
